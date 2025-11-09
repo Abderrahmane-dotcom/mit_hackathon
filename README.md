@@ -1,13 +1,15 @@
 <div align="center">
-  <img src="image/logo.jpg" alt="Research Agent Logo" width="300"/>
+  <img src="image/logo.jpg" alt="ReCriticAI Logo" width="300"/>
   
-  # 🤖 Multi-Agent Research Assistant
+  # 🤖 ReCriticAI
   
-  **Agentic AI for Accelerated Research**
+  **Research through Critical AI - Multi-Agent Research Assistant**
   
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
+  [![React](https://img.shields.io/badge/React-18+-61DAFB.svg?logo=react&logoColor=white)](https://react.dev/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5+-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![LangGraph](https://img.shields.io/badge/LangGraph-Multi--Agent-purple.svg)](https://github.com/langchain-ai/langgraph)
 </div>
 

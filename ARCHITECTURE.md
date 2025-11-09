@@ -7,12 +7,26 @@
 │                         USER INTERFACE                         │
 │                                                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │   main.py    │  │ examples.py  │  │   Jupyter    │         │
-│  │ (Interactive)│  │ (Demos)      │  │  Notebooks   │         │
+│  │ React Web UI │  │   main.py    │  │ examples.py  │         │
+│  │ (Port 5173)  │  │ (Interactive)│  │ (Demos)      │         │
+│  │ TypeScript   │  │     CLI      │  │   Jupyter    │         │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘         │
 └─────────┼──────────────────┼──────────────────┼────────────────┘
           │                  │                  │
-          └──────────────────┼──────────────────┘
+          │ HTTP/REST        │ Direct Import    │
+          ▼                  ▼                  ▼
+┌────────────────────────────────────────────────────────────────┐
+│                     BACKEND API LAYER                          │
+│                    (FastAPI - Port 8000)                       │
+│                                                                │
+│  ┌──────────────────────────────────────────────────────────┐ │
+│  │  API Endpoints: /health /research /reinitialize /config  │ │
+│  └──────────────────────────────────────────────────────────┘ │
+│                             ▼                                  │
+│  ┌──────────────────────────────────────────────────────────┐ │
+│  │            Research Service (Wrapper)                    │ │
+│  └──────────────────────────────────────────────────────────┘ │
+└────────────────────────────┬───────────────────────────────────┘
                              ▼
 ┌────────────────────────────────────────────────────────────────┐
 │                      RESEARCH SYSTEM                           │
@@ -348,26 +362,96 @@ Flow through LangGraph:
 ┌─────────────────────────────────────────────────────────┐
 │                    LIBRARIES                            │
 │                                                         │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐             │
-│  │LangChain │  │Beautiful │  │  Rank    │             │
-│  │LangGraph │  │  Soup    │  │  BM25    │             │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘             │
-└───────┼─────────────┼─────────────┼─────────────────────┘
-        │             │             │
-        └─────────────┼─────────────┘
+│  Backend:                         Frontend:            │
+│  ┌──────────┐  ┌──────────┐      ┌──────────┐         │
+│  │LangChain │  │Beautiful │      │  React   │         │
+│  │LangGraph │  │  Soup    │      │ Router   │         │
+│  │ FastAPI  │  │  Rank    │      │ Axios    │         │
+│  │ Pydantic │  │  BM25    │      │Tailwind  │         │
+│  └────┬─────┘  └────┬─────┘      └────┬─────┘         │
+└───────┼─────────────┼──────────────────┼───────────────┘
+        │             │                  │
+        └─────────────┼──────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────┐
 │                    OUR CODE                             │
 │                                                         │
-│  src/                                                   │
-│  ├── agents/         (LangChain + ChatGroq)            │
-│  ├── retrievers/     (BM25Okapi + LangChain)           │
-│  ├── scrapers/       (BeautifulSoup + Requests)        │
-│  ├── utils/          (Pure Python)                     │
-│  └── research_system.py  (LangGraph + All Above)       │
+│  Backend (Python):                                      │
+│  ├── backend/                                           │
+│  │   ├── app.py           (FastAPI routes)             │
+│  │   ├── research_service.py  (Service wrapper)        │
+│  │   └── config.py        (Configuration)              │
+│  ├── src/                                               │
+│  │   ├── agents/          (LangChain + ChatGroq)       │
+│  │   ├── retrievers/      (BM25Okapi + LangChain)      │
+│  │   ├── scrapers/        (BeautifulSoup + Requests)   │
+│  │   ├── utils/           (Pure Python)                │
+│  │   └── research_system.py  (LangGraph + All Above)   │
+│  │                                                      │
+│  Frontend (TypeScript):                                 │
+│  └── frontend/                                          │
+│      ├── src/pages/       (React components)           │
+│      ├── src/components/  (Reusable UI)                │
+│      ├── src/lib/         (API client + utils)         │
+│      └── src/hooks/       (Custom React hooks)         │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
-This architecture provides a scalable, maintainable, and extensible research system!
+## Full Stack Communication Flow
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  FRONTEND (React)                       │
+│                                                         │
+│  User Action (e.g., Submit Research Topic)             │
+│         │                                               │
+│         ▼                                               │
+│  [Upload.tsx] → [api.ts client]                        │
+│         │                                               │
+│         │ POST /research                                │
+│         │ { topic: "AI", sources: [...] }              │
+└─────────┼───────────────────────────────────────────────┘
+          │
+          │ HTTP/REST (Port 8000)
+          ▼
+┌─────────────────────────────────────────────────────────┐
+│                  BACKEND (FastAPI)                      │
+│                                                         │
+│  [app.py] → Validate Request                           │
+│         │                                               │
+│         ▼                                               │
+│  [research_service.py] → Call research()               │
+│         │                                               │
+│         ▼                                               │
+│  [research_system.py] → Execute Workflow               │
+│         │                                               │
+│         ├─► Researcher Agent                           │
+│         ├─► Reviewer Agents                            │
+│         └─► Synthesizer Agent                          │
+│         │                                               │
+│         ▼                                               │
+│  Return ResearchState                                  │
+│         │                                               │
+│         │ { topic, summary, critiques, insight, ... }  │
+└─────────┼───────────────────────────────────────────────┘
+          │
+          │ JSON Response
+          ▼
+┌─────────────────────────────────────────────────────────┐
+│                  FRONTEND (React)                       │
+│                                                         │
+│  [api.ts] → Parse response                             │
+│         │                                               │
+│         ▼                                               │
+│  [Dashboard.tsx] → Display agent activity              │
+│  [Report.tsx] → Show results & citations               │
+│         │                                               │
+│         ▼                                               │
+│  User sees research results                            │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+This architecture provides a **scalable, maintainable, and extensible full-stack research system** with modern web technologies and AI-powered multi-agent capabilities!

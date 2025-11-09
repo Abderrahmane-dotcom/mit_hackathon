@@ -1,13 +1,33 @@
 # Architecture Diagrams (Mermaid)
 
+## 📑 Table of Contents
+
+- [High-Level System Overview](#high-level-system-overview)
+- [Component Interaction Flow](#component-interaction-flow)
+- [Class Hierarchy](#class-hierarchy)
+- [State Flow](#state-flow)
+- [Data Flow](#data-flow)
+- [Full Stack Architecture](#full-stack-architecture)
+- [Frontend Architecture](#frontend-architecture)
+- [Docker Deployment](#docker-deployment)
+- [Development Workflow](#development-workflow)
+- [Data Flow (Complete System)](#data-flow-complete-system)
+
+
 ## High-Level System Overview
 
 ```mermaid
 graph TB
     subgraph UI["User Interface"]
+        WEB[React Frontend<br/>Vite + TypeScript]
         CLI[main.py<br/>Interactive CLI]
         EX[examples.py<br/>Demos]
         NB[Jupyter Notebooks]
+    end
+
+    subgraph API["Backend API"]
+        FAST[FastAPI Server<br/>Port 8000]
+        SERV[Research Service<br/>Wrapper]
     end
 
     subgraph RS["Research System"]
@@ -28,9 +48,13 @@ graph TB
         ARXIV[ArXiv<br/>Scraper]
     end
 
+    WEB -->|HTTP/REST| FAST
     CLI --> RS
     EX --> RS
     NB --> RS
+    
+    FAST --> SERV
+    SERV --> RS
     
     RS --> INIT
     INIT --> WORK
@@ -46,6 +70,7 @@ graph TB
     R --> ARXIV
 
     style UI fill:#e1f5ff
+    style API fill:#fff9c4
     style RS fill:#fff3e0
     style AGENTS fill:#f3e5f5
     style DATA fill:#e8f5e9
@@ -254,17 +279,19 @@ flowchart LR
     style Output fill:#e1f5ff
 ```
 
-## Backend Architecture
+## Full Stack Architecture
 
 ```mermaid
 graph TB
-    subgraph Client["Client Applications"]
-        WEB[Web Browser]
-        CURL[cURL/Postman]
-        PY[Python Client]
+    subgraph Frontend["Frontend (Port 5173)"]
+        HOME[Home Page<br/>System Status]
+        UPLOAD[Upload Page<br/>Config Research]
+        DASH[Dashboard<br/>Agent Visualization]
+        REPORT[Report Page<br/>Results & Citations]
+        API_CLIENT[API Client<br/>Axios]
     end
 
-    subgraph API["FastAPI Backend"]
+    subgraph Backend["Backend API (Port 8000)"]
         ROUTES[API Routes<br/>/health /research /config]
         SERVICE[Research Service]
         VALID[Pydantic Validation]
@@ -281,9 +308,12 @@ graph TB
         CACHE[Cache/Memory]
     end
 
-    WEB -->|HTTP/REST| ROUTES
-    CURL -->|HTTP/REST| ROUTES
-    PY -->|HTTP/REST| ROUTES
+    HOME --> API_CLIENT
+    UPLOAD --> API_CLIENT
+    DASH --> API_CLIENT
+    REPORT --> API_CLIENT
+    
+    API_CLIENT -->|HTTP/REST| ROUTES
     
     ROUTES --> VALID
     VALID --> SERVICE
@@ -293,10 +323,77 @@ graph TB
     DATA --> PDFS
     DATA --> CACHE
 
-    style Client fill:#e3f2fd
-    style API fill:#fff3e0
+    style Frontend fill:#e1f5ff
+    style Backend fill:#fff3e0
     style Core fill:#f3e5f5
     style Storage fill:#e8f5e9
+```
+
+## Frontend Architecture
+
+```mermaid
+graph TB
+    subgraph Pages["Pages (React Router)"]
+        HOME[Home.tsx<br/>Landing & Status]
+        UPLOAD[Upload.tsx<br/>Research Config]
+        DASH[Dashboard.tsx<br/>Agent Activity]
+        REPORT[Report.tsx<br/>Research Results]
+    end
+
+    subgraph Components["Components"]
+        NAV[Navigation.tsx<br/>App Header]
+        TOAST[Toast/Toaster<br/>Notifications]
+    end
+
+    subgraph Lib["Libraries & Utils"]
+        API[api.ts<br/>Backend Client]
+        UTILS[utils.ts<br/>Helpers]
+        HOOKS[use-toast.ts<br/>Custom Hook]
+    end
+
+    subgraph Styling["Styling"]
+        TAILWIND[Tailwind CSS<br/>Utility Classes]
+        CSS[index.css<br/>Global Styles]
+    end
+
+    subgraph App["App Entry"]
+        MAIN[main.tsx<br/>React Mount]
+        APP[App.tsx<br/>Router Setup]
+    end
+
+    MAIN --> APP
+    APP --> NAV
+    APP --> HOME
+    APP --> UPLOAD
+    APP --> DASH
+    APP --> REPORT
+    
+    HOME --> API
+    UPLOAD --> API
+    DASH --> API
+    REPORT --> API
+    
+    UPLOAD --> HOOKS
+    DASH --> HOOKS
+    REPORT --> HOOKS
+    
+    HOOKS --> TOAST
+    
+    API --> UTILS
+    
+    NAV --> TAILWIND
+    HOME --> TAILWIND
+    UPLOAD --> TAILWIND
+    DASH --> TAILWIND
+    REPORT --> TAILWIND
+    
+    APP --> CSS
+
+    style Pages fill:#e1f5ff
+    style Components fill:#f3e5f5
+    style Lib fill:#fff3e0
+    style Styling fill:#e8f5e9
+    style App fill:#fff9c4
 ```
 
 ## Docker Deployment
@@ -313,14 +410,122 @@ graph LR
 
     subgraph Host["Host Machine"]
         FILES[PDF Files<br/>./files/]
-        BROWSER[Browser<br/>localhost:8000]
+        FRONTEND[Frontend Dev<br/>localhost:5173]
+        BROWSER[Browser]
     end
 
     FILES -.->|Volume Mount| VOL
-    BROWSER -->|HTTP| APP
+    BROWSER -->|Visit| FRONTEND
+    FRONTEND -->|API Calls| APP
     APP --> RSYS
     RSYS --> VOL
 
     style Container fill:#e1f5ff
     style Host fill:#f3e5f5
+```
+
+## Development Workflow
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant FE as Frontend (Vite)
+    participant BE as Backend (FastAPI)
+    participant RS as Research System
+    participant EXT as External APIs
+
+    Dev->>FE: npm run dev
+    Note over FE: Starts on :5173<br/>Hot Module Reload
+    
+    Dev->>BE: python -m backend.run
+    Note over BE: Starts on :8000<br/>Auto-reload enabled
+    
+    Dev->>FE: Opens http://localhost:5173
+    FE->>FE: Loads React App
+    
+    FE->>BE: GET /health
+    BE-->>FE: {"status": "healthy"}
+    
+    Dev->>FE: Configures research topic
+    FE->>BE: POST /research
+    BE->>RS: Initialize research
+    RS->>EXT: Scrape Wikipedia/ArXiv
+    EXT-->>RS: External data
+    RS->>RS: Multi-agent processing
+    RS-->>BE: Research result
+    BE-->>FE: JSON response
+    FE->>FE: Render results
+    FE-->>Dev: Display report
+
+    style Dev fill:#fff9c4
+    style FE fill:#e1f5ff
+    style BE fill:#fff3e0
+    style RS fill:#f3e5f5
+    style EXT fill:#e8f5e9
+```
+
+## Data Flow (Complete System)
+
+```mermaid
+flowchart TB
+    subgraph User["User Interaction"]
+        BROWSER[Web Browser]
+    end
+
+    subgraph Frontend["Frontend Layer"]
+        UI[React Components]
+        STATE[State Management]
+        HTTP[HTTP Client]
+    end
+
+    subgraph Backend["Backend Layer"]
+        ENDPOINT[REST Endpoints]
+        VALIDATION[Request Validation]
+        SERVICE[Research Service]
+    end
+
+    subgraph Core["Core System"]
+        INIT[System Init]
+        WORKFLOW[Research Workflow]
+    end
+
+    subgraph Agents["Agent Layer"]
+        RESEARCHER[Researcher]
+        REVIEWERS[Reviewers A/B]
+        SYNTH[Synthesizer]
+    end
+
+    subgraph Data["Data Layer"]
+        LOCAL[PDF Files]
+        WIKI[Wikipedia]
+        ARXIV[ArXiv]
+    end
+
+    BROWSER -->|User Input| UI
+    UI --> STATE
+    STATE --> HTTP
+    HTTP -->|POST /research| ENDPOINT
+    ENDPOINT --> VALIDATION
+    VALIDATION --> SERVICE
+    SERVICE --> INIT
+    INIT --> WORKFLOW
+    WORKFLOW --> RESEARCHER
+    RESEARCHER --> LOCAL
+    RESEARCHER --> WIKI
+    RESEARCHER --> ARXIV
+    RESEARCHER --> REVIEWERS
+    REVIEWERS --> SYNTH
+    SYNTH --> SERVICE
+    SERVICE -->|JSON Response| ENDPOINT
+    ENDPOINT --> HTTP
+    HTTP --> STATE
+    STATE --> UI
+    UI -->|Display Results| BROWSER
+
+    style User fill:#fff9c4
+    style Frontend fill:#e1f5ff
+    style Backend fill:#fff3e0
+    style Core fill:#f3e5f5
+    style Agents fill:#f8bbd0
+    style Data fill:#e8f5e9
 ```
