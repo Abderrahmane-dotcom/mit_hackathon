@@ -19,6 +19,7 @@ A sophisticated AI-powered research system that combines BM25 document retrieval
 - **BM25 Retrieval**: Fast and efficient lexical search over document corpus
 - **Multi-Agent Debate**: Three-agent system (Researcher → 2 Reviewers → Synthesizer) for balanced insights
 - **ArXiv Integration**: Scrape academic papers with PDF content extraction
+- **REST API Backend**: FastAPI-based API for easy integration
 - **Modular Architecture**: Clean, class-based design with separated concerns
 
 ## 🏗️ Architecture
@@ -59,7 +60,7 @@ A sophisticated AI-powered research system that combines BM25 document retrieval
 
 ```
 mit_hackathon/
-├── main.py                          # Main entry point
+├── main.py                          # Main entry point (CLI)
 ├── examples.py                      # Usage examples
 ├── README.md                        # This file
 ├── requirements.txt                 # Python dependencies
@@ -67,6 +68,16 @@ mit_hackathon/
 ├── .env.example                     # Environment variables template
 ├── API_KEY_SETUP.md                 # API key setup guide
 ├── files/                           # PDF documents directory
+├── backend/                         # 🆕 FastAPI Backend
+│   ├── __init__.py
+│   ├── app.py                      # FastAPI application
+│   ├── config.py                   # Backend configuration
+│   ├── research_service.py         # Research service wrapper
+│   ├── run.py                      # Server runner script
+│   ├── requirements.txt            # Backend dependencies
+│   ├── README.md                   # Backend documentation
+│   ├── Dockerfile                  # Docker configuration
+│   └── docker-compose.yml          # Docker Compose setup
 ├── src/
 │   ├── __init__.py
 │   ├── config.py                    # Configuration settings
@@ -277,6 +288,58 @@ python scrape_wiki.py
 # Test ArXiv scraper
 python scrape_arxiv.py
 ```
+
+## 🌐 Backend API
+
+The project includes a FastAPI-based REST API for easy integration with web applications and other services.
+
+### Quick Start
+
+```bash
+# Install backend dependencies
+cd backend
+pip install -r requirements.txt
+
+# Set environment variables
+export GROQ_API_KEY="your-api-key-here"
+
+# Run the server
+python run.py
+```
+
+The API will be available at `http://localhost:8000`
+
+### API Endpoints
+
+- `GET /` - API status
+- `GET /health` - Health check
+- `POST /research` - Perform research
+- `POST /reinitialize` - Reinitialize system
+- `GET /config` - Get configuration
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:8000/research \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "machine learning",
+    "use_wikipedia": true,
+    "use_arxiv": true,
+    "max_wikipedia_articles": 3,
+    "max_arxiv_papers": 3
+  }'
+```
+
+### Docker Deployment
+
+```bash
+# Build and run with Docker Compose
+cd backend
+docker-compose up --build
+```
+
+**📖 See full documentation:** [backend/README.md](backend/README.md)
 
 ## 🔧 Configuration
 
