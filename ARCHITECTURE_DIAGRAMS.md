@@ -14,6 +14,20 @@
 - [Data Flow (Complete System)](#data-flow-complete-system)
 
 
+### 🎯 **Video Production Guide**
+
+| Timeline | Diagram to Show | Key Tech to Highlight |
+|----------|----------------|----------------------|
+| 0:00-0:08 | [Full Stack Architecture](#full-stack-architecture) | React, FastAPI, Multi-Agent |
+| 0:08-0:20 | [Frontend Architecture](#frontend-architecture) | React 18, TypeScript, Vite, Tailwind |
+| 0:20-0:35 | [High-Level System Overview](#high-level-system-overview) | FastAPI, Pydantic, GROQ, Llama |
+| 0:35-0:48 | [Component Interaction Flow](#component-interaction-flow) | BM25, Wikipedia, ArXiv, LangGraph |
+| 0:48-0:56 | [Data Flow Complete](#data-flow-complete-system) | REST API, State Management |
+| 0:56-1:00 | [Development Workflow](#development-workflow) | Docker, GitHub |
+
+---
+
+
 ## High-Level System Overview
 
 ```mermaid
