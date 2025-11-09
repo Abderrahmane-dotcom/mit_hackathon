@@ -13,15 +13,17 @@ class Config:
     # Project paths
     BACKEND_ROOT = Path(__file__).parent
     PROJECT_ROOT = BACKEND_ROOT.parent
-    FILES_DIR = PROJECT_ROOT / "files"
+    # Use the backend/files directory where PDFs are stored for this project
+    FILES_DIR = BACKEND_ROOT / "files"
     
     # ============================================================================
     # API Configuration
     # ============================================================================
+    os.environ["GROQ_API_KEY"] = "put_your_groq_api_key_here"
     GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY")
     
     # Set environment variable if not already set
-    if GROQ_API_KEY and GROQ_API_KEY != "put-your-groq-api-key-here":
+    if GROQ_API_KEY and GROQ_API_KEY != "put_your_groq_api_key_here":
         os.environ["GROQ_API_KEY"] = GROQ_API_KEY
     
     # LLM Configuration
@@ -44,6 +46,10 @@ class Config:
     HOST = os.getenv("HOST", "0.0.0.0")
     PORT = int(os.getenv("PORT", "8000"))
     DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+    
+    # Request Timeouts (in seconds)
+    RESEARCH_TIMEOUT = int(os.getenv("RESEARCH_TIMEOUT", "300"))  # 5 minutes default
+    REINITIALIZE_TIMEOUT = int(os.getenv("REINITIALIZE_TIMEOUT", "120"))  # 2 minutes default
     
     @classmethod
     def ensure_files_dir(cls):

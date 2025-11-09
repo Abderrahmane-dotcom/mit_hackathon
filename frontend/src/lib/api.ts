@@ -8,7 +8,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // Add 30 second timeout
+  timeout: 300000, // 5 minute timeout for long-running research requests
 });
 
 // Add request interceptor for debugging
@@ -45,13 +45,19 @@ export interface ResearchRequest {
 
 export interface ResearchResponse {
   status: string;
-  message: string;
-  report?: any;
+  topic: string;
+  summary: string;
+  critique_a: string;
+  critique_b: string;
+  insight: string;
+  sources: string[];
+  message?: string;
 }
 
 export interface HealthResponse {
   status: string;
   message: string;
+  pdf_count?: number;
 }
 
 export interface ConfigResponse {

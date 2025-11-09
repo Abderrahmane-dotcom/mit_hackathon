@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload as UploadIcon, Link as LinkIcon, FileText, Loader2 } from 'lucide-react';
+import { FileText, Loader2 } from 'lucide-react';
 import { researchAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -10,6 +10,8 @@ const Upload = () => {
   const [topic, setTopic] = useState('');
   const [useWikipedia, setUseWikipedia] = useState(true);
   const [useArxiv, setUseArxiv] = useState(true);
+  const [useLocalPdfs, setUseLocalPdfs] = useState(false);
+  const [localPdfCount, setLocalPdfCount] = useState<number | null>(null);
   const [maxWikipediaArticles, setMaxWikipediaArticles] = useState(3);
   const [maxArxivPapers, setMaxArxivPapers] = useState(3);
   const [isResearching, setIsResearching] = useState(false);
@@ -30,8 +32,9 @@ const Upload = () => {
       // Start research
       const result = await researchAPI.research({
         topic,
-        use_wikipedia: useWikipedia,
-        use_arxiv: useArxiv,
+        // If user selected local PDFs, disable external scrapers
+        use_wikipedia: useLocalPdfs ? false : useWikipedia,
+        use_arxiv: useLocalPdfs ? false : useArxiv,
         max_wikipedia_articles: maxWikipediaArticles,
         max_arxiv_papers: maxArxivPapers,
       });
@@ -58,6 +61,43 @@ const Upload = () => {
     }
   };
 
+  useEffect(() => {
+    // Fetch health to get pdf_count
+    let mounted = true;
+    (async () => {
+      try {
+        const health = await researchAPI.health();
+        if (!mounted) return;
+        // health may include pdf_count (backend provides it)
+        // @ts-ignore - optional field added to type
+        setLocalPdfCount(health.pdf_count ?? null);
+      } catch (err) {
+        console.warn('Failed to fetch health info', err);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleReinitialize = async () => {
+    try {
+      setIsResearching(true);
+      await researchAPI.reinitialize();
+      // refresh health
+      const health = await researchAPI.health();
+      // @ts-ignore
+      setLocalPdfCount(health.pdf_count ?? null);
+      toast({ title: 'Reinitialized', description: 'PDF index refreshed' });
+    } catch (err: any) {
+      console.error('Reinitialize failed', err);
+      toast({ title: 'Reinitialize failed', description: err.message || 'Failed' , variant: 'destructive'});
+    } finally {
+      setIsResearching(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-4xl mx-auto">
@@ -71,23 +111,61 @@ const Upload = () => {
         <div className="bg-card rounded-2xl shadow-lg border border-border p-8 space-y-8">
           {/* Topic Input */}
           <div className="space-y-3">
-            <label className="block text-sm font-medium text-foreground">
+            <label htmlFor="topic" className="block text-sm font-medium text-foreground">
               Research Topic *
             </label>
-            <input
-              type="text"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g., quantum computing, machine learning, CRISPR gene editing"
-              className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-              disabled={isResearching}
-            />
+              <input
+                id="topic"
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g., quantum computing, machine learning, CRISPR gene editing"
+                className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                disabled={isResearching}
+              />
           </div>
 
           {/* Source Configuration */}
-          <div className="space-y-4">
+            <div className="space-y-4">
             <h3 className="text-lg font-semibold text-foreground">Data Sources</h3>
             
+            {/* Local PDFs info */}
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
+              <div className="space-y-1">
+                <div className="text-sm text-foreground font-medium">Local PDFs</div>
+                <div className="text-xs text-muted-foreground">Located in backend/files</div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="text-sm text-foreground">{localPdfCount ?? '—'}</div>
+                <button
+                  onClick={handleReinitialize}
+                  className="px-3 py-1 bg-accent text-accent-foreground rounded-md text-sm hover:opacity-90"
+                  disabled={isResearching}
+                >
+                  Reindex
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3 mt-2">
+              <input
+                type="checkbox"
+                id="localPdfs"
+                checked={useLocalPdfs}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setUseLocalPdfs(checked);
+                  // If using local PDFs, turn off external scrapers by default
+                  if (checked) {
+                    setUseWikipedia(false);
+                    setUseArxiv(false);
+                  }
+                }}
+                className="w-4 h-4 text-accent border-input rounded focus:ring-accent"
+                disabled={isResearching}
+              />
+              <label htmlFor="localPdfs" className="font-medium text-foreground">Use Local PDFs Only</label>
+            </div>
             <div className="grid md:grid-cols-2 gap-6">
               {/* Wikipedia */}
               <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/30">
@@ -106,15 +184,16 @@ const Upload = () => {
                 </div>
                 {useWikipedia && (
                   <div className="ml-7 space-y-2">
-                    <label className="block text-sm text-muted-foreground">
+                    <label htmlFor="maxWikipediaArticles" className="block text-sm text-muted-foreground">
                       Max Articles
                     </label>
                     <input
+                      id="maxWikipediaArticles"
                       type="number"
                       min="1"
                       max="10"
                       value={maxWikipediaArticles}
-                      onChange={(e) => setMaxWikipediaArticles(parseInt(e.target.value))}
+                      onChange={(e) => setMaxWikipediaArticles(Number.parseInt(e.target.value))}
                       className="w-20 px-3 py-1 rounded border border-input bg-background text-foreground"
                       disabled={isResearching}
                     />
@@ -139,15 +218,16 @@ const Upload = () => {
                 </div>
                 {useArxiv && (
                   <div className="ml-7 space-y-2">
-                    <label className="block text-sm text-muted-foreground">
+                    <label htmlFor="maxArxivPapers" className="block text-sm text-muted-foreground">
                       Max Papers
                     </label>
                     <input
+                      id="maxArxivPapers"
                       type="number"
                       min="1"
                       max="10"
                       value={maxArxivPapers}
-                      onChange={(e) => setMaxArxivPapers(parseInt(e.target.value))}
+                      onChange={(e) => setMaxArxivPapers(Number.parseInt(e.target.value))}
                       className="w-20 px-3 py-1 rounded border border-input bg-background text-foreground"
                       disabled={isResearching}
                     />

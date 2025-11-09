@@ -85,7 +85,17 @@ class ResearcherAgent(BaseAgent):
                 max_articles=self.max_wikipedia_articles
             )
             
-            for article in wiki_articles:
+            wiki_results = wiki_articles.get("results", [])
+            is_fallback = wiki_articles.get("is_fallback", False)
+            fallback_message = wiki_articles.get("message", "")
+            
+            # Add fallback warning if present
+            if is_fallback and fallback_message:
+                context_pieces.append(
+                    f"[WIKIPEDIA SEARCH NOTE: {fallback_message}]"
+                )
+            
+            for article in wiki_results:
                 title = article.get("title", "Unknown")
                 content = article.get("content", "")
                 
@@ -93,10 +103,12 @@ class ResearcherAgent(BaseAgent):
                 if len(snippet) > Config.MAX_SNIPPET_LENGTH:
                     snippet = snippet[:Config.MAX_SNIPPET_LENGTH].rsplit(" ", 1)[0] + " ..."
                 
+                result_type = "WIKIPEDIA (FALLBACK)" if is_fallback else "WIKIPEDIA"
                 context_pieces.append(
-                    f"[WIKIPEDIA: {title}]\n{snippet}"
+                    f"[{result_type}: {title}]\n{snippet}"
                 )
-                sources.append(f"Wikipedia: {title}")
+                source_prefix = "Wikipedia (Fallback)" if is_fallback else "Wikipedia"
+                sources.append(f"{source_prefix}: {title}")
         
         # 3. Scrape ArXiv papers
         if self.arxiv_scraper:
@@ -155,13 +167,15 @@ class ResearcherAgent(BaseAgent):
             f"Read the following excerpts from {source_desc} and produce a concise summary "
             f"of the main findings or facts relevant to the topic. "
             f"Be explicit about which sources support which points.\n\n"
+            f"Note any search fallback messages or less relevant results to maintain transparency.\n\n"
             f"EXCERPTS:\n\n{context}\n\n"
             "Return a comprehensive summary that:\n"
             "1. Synthesizes information from all sources\n"
             "2. Highlights key findings from academic papers (ArXiv)\n"
             "3. Incorporates general knowledge (Wikipedia)\n"
             "4. References specific PDF documents when relevant\n"
-            "5. Notes any conflicts or complementary information between sources"
+            "5. Notes any search fallbacks or relevance warnings\n"
+            "6. Notes any conflicts or complementary information between sources"
         )
         
         # Get LLM response

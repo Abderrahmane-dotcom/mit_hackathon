@@ -3,6 +3,8 @@ Research service that wraps the research system for API usage
 """
 
 import sys
+import logging
+import traceback
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -11,6 +13,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.research_system import ResearchSystem
 from backend.config import Config
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 class ResearchService:
@@ -98,23 +107,53 @@ class ResearchService:
             Research results dictionary
         """
         if not self.is_initialized():
+            logger.error("Research attempted before initialization")
             raise RuntimeError("Research service not initialized")
         
-        # If scrapers need to be reconfigured, reinitialize
-        if (use_wikipedia is not None or use_arxiv is not None or
-            max_wikipedia_articles is not None or max_arxiv_papers is not None):
+        try:
+            logger.info(f"Starting research on topic: {topic}")
+            logger.info(f"Config - Wikipedia: {use_wikipedia}, ArXiv: {use_arxiv}, "
+                       f"Max Wiki: {max_wikipedia_articles}, Max ArXiv: {max_arxiv_papers}")
             
-            self.initialize(
-                use_wikipedia=use_wikipedia if use_wikipedia is not None else True,
-                use_arxiv=use_arxiv if use_arxiv is not None else True,
-                max_wikipedia_articles=max_wikipedia_articles,
-                max_arxiv_papers=max_arxiv_papers
-            )
-        
-        # Perform research
-        result = self.system.research(topic)
-        
-        return result
+            # If scrapers need to be reconfigured, reinitialize
+            if (use_wikipedia is not None or use_arxiv is not None or
+                max_wikipedia_articles is not None or max_arxiv_papers is not None):
+                
+                logger.info("Reinitializing with new scraper configuration...")
+                self.initialize(
+                    use_wikipedia=use_wikipedia if use_wikipedia is not None else True,
+                    use_arxiv=use_arxiv if use_arxiv is not None else True,
+                    max_wikipedia_articles=max_wikipedia_articles,
+                    max_arxiv_papers=max_arxiv_papers
+                )
+            
+            # Check LLM configuration
+            if not Config.GROQ_API_KEY:
+                logger.error("GROQ API key not configured")
+                raise RuntimeError("GROQ_API_KEY not set in environment")
+            
+            # Check if we have any sources enabled
+            if not (self.system.use_wikipedia or self.system.use_arxiv or self.system.retriever):
+                logger.warning("No research sources enabled (no PDFs indexed, Wikipedia and ArXiv disabled)")
+            
+            # Perform research
+            logger.info("Starting multi-agent research workflow...")
+            result = self.system.research(topic)
+            
+            # Validate result structure
+            required_keys = ['topic', 'summary', 'critique_A', 'critique_B', 'insight']
+            missing_keys = [k for k in required_keys if k not in result]
+            if missing_keys:
+                logger.error(f"Research result missing required keys: {missing_keys}")
+                raise ValueError(f"Incomplete research result, missing: {missing_keys}")
+            
+            logger.info("Research completed successfully")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Research failed: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     def get_system_info(self) -> Dict[str, Any]:
         """Get information about the research system"""

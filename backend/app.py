@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 import uvicorn
 import sys
+import logging
+import traceback
 from pathlib import Path
 
 # Add project root to path
@@ -15,6 +17,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from backend.config import Config
 from backend.research_service import ResearchService
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -112,43 +121,104 @@ async def health_check():
 
 
 @app.post("/research", response_model=ResearchResponse)
-async def research_topic(request: ResearchRequest):
+async def research_topic(request: ResearchRequest, background_tasks: BackgroundTasks):
     """
     Research a topic using the multi-agent system
     
     Args:
         request: Research request with topic and configuration
+        background_tasks: FastAPI background tasks manager
         
     Returns:
         Research results with summary, critiques, and insights
     """
     if not research_service:
+        logger.error("Research endpoint called before service initialization")
         raise HTTPException(status_code=503, detail="Research service not initialized")
     
     try:
-        # Perform research
-        result = research_service.research(
-            topic=request.topic,
-            use_wikipedia=request.use_wikipedia,
-            use_arxiv=request.use_arxiv,
-            max_wikipedia_articles=request.max_wikipedia_articles,
-            max_arxiv_papers=request.max_arxiv_papers
-        )
+        logger.info(f"Research request received - Topic: {request.topic}")
+        logger.info(f"Config - Wikipedia: {request.use_wikipedia}, ArXiv: {request.use_arxiv}, "
+                   f"Max Wiki: {request.max_wikipedia_articles}, Max ArXiv: {request.max_arxiv_papers}")
         
-        return ResearchResponse(
-            topic=result.get("topic", request.topic),
-            summary=result.get("summary", ""),
-            critique_a=result.get("critique_A", ""),
-            critique_b=result.get("critique_B", ""),
-            insight=result.get("insight", ""),
-            sources=result.get("sources", []),
-            status="success"
-        )
+        # Check environment
+        if not Config.GROQ_API_KEY:
+            logger.error("GROQ API key not configured")
+            raise HTTPException(
+                status_code=500,
+                detail="GROQ_API_KEY not set in environment. Configure the API key and restart the server."
+            )
+        
+        # Validate state
+        if not research_service.is_initialized():
+            logger.error("Research service reports not initialized")
+            raise HTTPException(status_code=503, detail="Research service lost initialization state")
+        
+        from asyncio import wait_for, TimeoutError
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        # Run research in thread pool with timeout
+        logger.info("Starting research with timeout...")
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as pool:
+            try:
+                research_task = loop.run_in_executor(
+                    pool,
+                    lambda: research_service.research(
+                        topic=request.topic,
+                        use_wikipedia=request.use_wikipedia,
+                        use_arxiv=request.use_arxiv,
+                        max_wikipedia_articles=request.max_wikipedia_articles,
+                        max_arxiv_papers=request.max_arxiv_papers
+                    )
+                )
+                result = await wait_for(research_task, timeout=Config.RESEARCH_TIMEOUT)
+                
+            except TimeoutError:
+                logger.error(f"Research timed out after {Config.RESEARCH_TIMEOUT}s")
+                raise HTTPException(
+                    status_code=504,  # Gateway Timeout
+                    detail=f"Research timed out after {Config.RESEARCH_TIMEOUT} seconds. "
+                           "Try reducing the number of sources or splitting into smaller queries."
+                )
+        
+        # Validate result structure
+        if not isinstance(result, dict):
+            logger.error(f"Invalid result type: {type(result)}")
+            raise HTTPException(
+                status_code=500,
+                detail="Research returned invalid result type"
+            )
+        
+        # Construct response, with detailed logging for missing fields
+        try:
+            response = ResearchResponse(
+                topic=result.get("topic", request.topic),
+                summary=result.get("summary", ""),
+                critique_a=result.get("critique_A", ""),
+                critique_b=result.get("critique_B", ""),
+                insight=result.get("insight", ""),
+                sources=result.get("sources", []),
+                status="success"
+            )
+            logger.info("Research completed successfully")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to construct response: {str(e)}")
+            logger.error(f"Result keys: {list(result.keys())}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to construct research response"
+            )
     
     except Exception as e:
+        logger.error(f"Research failed: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
-            detail=f"Research failed: {str(e)}"
+            detail=f"Research failed: {str(e)}\nCheck server logs for details."
         )
 
 
