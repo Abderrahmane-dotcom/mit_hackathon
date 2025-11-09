@@ -28,7 +28,7 @@ class Config:
         os.environ["GROQ_API_KEY"] = GROQ_API_KEY
     
     # LLM Configuration
-    LLM_MODEL = "llama-3.3-70b-versatile"
+    LLM_MODEL = "llama-3.1-8b-instant"
     LLM_TEMPERATURE = 0
     
     # Document Processing
