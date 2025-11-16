@@ -15,7 +15,7 @@
 
 ---
 
-A sophisticated AI-powered research system that combines **BM25 document retrieval**, **Wikipedia scraping**, **ArXiv integration**, and **multi-agent debate patterns** using LangGraph for comprehensive topic analysis.
+An AI-powered research system that combines **BM25 document retrieval**, **Wikipedia scraping**, **ArXiv integration**, and **multi-agent debate patterns** using LangGraph for comprehensive topic analysis.
 
 ## 📚 Documentation
 
